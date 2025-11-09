@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fatih Hüseyin’i Ne Kadar Tanıyorsun? (3 Seçenekli)</title>
+<style>
+  :root{ --bg:#0b1020; --card:#111934; --text:#eaf0ff; --muted:#a4b4ff; --accent:#7aa2ff; --ok:#36d399; --bad:#f87171; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,'Noto Sans',sans-serif;background:linear-gradient(135deg,#0b1020,#0e1630);color:var(--text)}
+  .wrap{max-width:900px;margin:auto;padding:20px}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  h1{margin:0 0 6px}
+  p.sub{margin:0 0 12px;color:var(--muted)}
+  .q{margin:14px 0;padding:14px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:#0e1530}
+  .q h3{margin:0 0 10px;font-size:1.05rem}
+  .choices{display:grid;gap:8px}
+  .btn{border:none;border-radius:12px;padding:10px 12px;cursor:pointer;background:#17224a;color:#eaf0ff;text-align:left;font-weight:600;transition:.15s}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.correct{background:rgba(54,211,153,.16);border:1px solid rgba(54,211,153,.6)}
+  .btn.wrong{background:rgba(248,113,113,.16);border:1px solid rgba(248,113,113,.6)}
+  .btn.locked{opacity:.7;pointer-events:none}
+  .meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .pill{background:#121c45;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:6px 10px;color:#c8d2ff;font-size:12px}
+  .result{margin-top:14px;padding:12px;border-radius:16px;background:#0e1530;border:1px solid rgba(255,255,255,.08)}
+  .bar{height:10px;background:#1a2447;border-radius:999px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#4aa3ff,#35d49c);width:0%}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .act{background:var(--accent);border:none;color:white;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .sec{background:#1a2447;border:none;color:#eaf0ff;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .fade{animation:fade .25s ease}
+  @keyframes fade{from{opacity:.2;transform:translateY(6px)} to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card fade">
+    <h1>Fatih Hüseyin’i Ne Kadar Tanıyorsun?</h1>
+    <p class="sub">Her soruda 3 seçenek var. Doğruya tıkladığında anında puanlanır. En sonda yüzde skorunu görürsün. 🎯</p>
+
+    <div id="quiz"></div>
+
+    <div class="meta">
+      <span class="pill" id="progressPill">0/10 soru</span>
+      <span class="pill" id="scorePill">Skor: 0</span>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button class="act" id="finishBtn">Testi Bitir</button>
+      <button class="sec" id="resetBtn">Sıfırla</button>
+    </div>
+
+    <div class="result fade" id="resultBox" style="display:none">
+      <div id="scoreText">Skorun: 0/10 (0%)</div>
+      <div class="bar" style="margin-top:8px"><i id="barFill"></i></div>
+      <p id="feedback" style="margin-top:8px;color:#cbd6ff"></p>
+      <details style="margin-top:6px">
+        <summary>Doğru cevap anahtarı</summary>
+        <ol id="keyList" style="margin-top:6px"></ol>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Sorular: 3 seçenek + doğru index
+  const QUESTIONS = [
+    { q: "En sevdiği yemek?", choices: ["Mantı","İskender","Adana kebap"], correct: 0 },
+    { q: "En sevdiği renk?", choices: ["Beyaz","Mavi","Siyah"], correct: 0 },
+    { q: "En sevdiği müzik grubu?", choices: ["Duman","maNga","Athena"], correct: 0 },
+    { q: "En çok gitmek istediği ülke?", choices: ["Almanya","İtalya","Japonya"], correct: 0 },
+    { q: "En sevdiği mevsim?", choices: ["Sonbahar","Yaz","Kış"], correct: 0 },
+    { q: "Kahve mi çay mı?", choices: ["Kahve","Çay","Limonata"], correct: 0 },
+    { q: "En sevdiği spor?", choices: ["Basketbol","Futbol","Voleybol"], correct: 0 },
+    { q: "En sevdiği tatlı?", choices: ["Fakir pastası","Sütlaç","Baklava"], correct: 0 },
+    { q: "Sabah erken mi kalkar, geç mi?", choices: ["Geç","Erken","Duruma göre"], correct: 0 },
+    { q: "En çok korktuğu hayvan?", choices: ["Örümcek","Yılan","Köpek"], correct: 0 },
+  ];
+
+  // İstersen soruları karıştırmak istersen true yap
+  const SHUFFLE_QUESTIONS = false;
+  const SHUFFLE_CHOICES = true;
+
+  function shuffle(arr){
+    for(let i=arr.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]] = [arr[j],arr[i]];
+    }
+  }
+
+  const quiz = document.getElementById('quiz');
+  const progressPill = document.getElementById('progressPill');
+  const scorePill = document.getElementById('scorePill');
+  const finishBtn = document.getElementById('finishBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const resultBox = document.getElementById('resultBox');
+  const scoreText = document.getElementById('scoreText');
+  const barFill = document.getElementById('barFill');
+  const feedback = document.getElementById('feedback');
+  const keyList = document.getElementById('keyList');
+
+  let state = { correct: 0, answered: 0 };
+
+  function build(){
+    quiz.innerHTML = "";
+    resultBox.style.display = "none";
+    state = { correct: 0, answered: 0 };
+
+    // Anahtar listesini hazırla
+    keyList.innerHTML = "";
+
+    // Opsiyonel karıştırma
+    const data = QUESTIONS.map(q => ({...q})); // kopya
+    if(SHUFFLE_QUESTIONS) shuffle(data);
+
+    data.forEach((item, qi) => {
+      // Seçenekleri karıştırırken doğru indexi koru
+      const options = item.choices.map((t, idx) => ({ t, idx }));
+      if(SHUFFLE_CHOICES) shuffle(options);
+      const correctIdxAfter = options.findIndex(o => o.idx === item.correct);
+
+      // Soru kartı
+      const box = document.createElement('div');
+      box.className = "q fade";
+      box.dataset.lock = "0";
+      box.innerHTML = `<h3>${qi+1}) ${item.q}</h3>`;
+
+      const area = document.createElement('div');
+      area.className = "choices";
+
+      options.forEach((opt, oi) => {
+        const b = document.createElement('button');
+        b.className = "btn";
+        b.textContent = opt.t;
+        b.addEventListener('click', () => {
+          if(box.dataset.lock === "1") return; // kilitliyse tıklama
+          box.dataset.lock = "1";
+          const isCorrect = (oi === correctIdxAfter);
+          // işaretle
+          if(isCorrect){
+            b.classList.add('correct');
+            state.correct += 1;
+          }else{
+            b.classList.add('wrong');
+            // doğru olanı da işaretle
+            const buttons = area.querySelectorAll('.btn');
+            buttons[correctIdxAfter]?.classList.add('correct');
+          }
+          // diğerlerini kilitle
+          area.querySelectorAll('.btn').forEach(btn=>{
+            if(btn!==b && !btn.classList.contains('correct')) btn.classList.add('locked');
+            if(btn===b && !isCorrect) btn.classList.add('locked');
+          });
+          state.answered += 1;
+          updateMeta();
+        });
+        area.appendChild(b);
+      });
+
+      box.appendChild(area);
+      quiz.appendChild(box);
+
+      // Anahtar maddesi
+      const li = document.createElement('li');
+      li.textContent = `${item.q} → ${item.choices[item.correct]}`;
+      keyList.appendChild(li);
+    });
+
+    updateMeta();
+  }
+
+  function updateMeta(){
+    progressPill.textContent = `${state.answered}/${QUESTIONS.length} soru`;
+    scorePill.textContent = `Skor: ${state.correct}`;
+  }
+
+  function finish(){
+    const total = QUESTIONS.length;
+    const pct = Math.round((state.correct/total)*100);
+    scoreText.innerHTML = `Skorun: <b>${state.correct}/${total}</b> (${pct}%)`;
+    barFill.style.width = pct + "%";
+    feedback.innerHTML =
+      pct===100 ? "Efsane! 🔥 Tam isabet." :
+      pct>=80 ? "Harika! 🎉 Çok iyi tanıyorsun." :
+      pct>=60 ? "Güzel! 👍 Biraz daha tanısan tam olacak." :
+      pct>=40 ? "Fena değil. 💡 Birkaç detay kaçmış." :
+      pct>0 ? "Zorlanmışsın. 🤔 Biraz daha konuşmak lazım!" :
+      "Hmm… Yine deneyelim mi? 🙂";
+    resultBox.style.display = "block";
+    resultBox.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  finishBtn.addEventListener('click', finish);
+  resetBtn.addEventListener('click', build);
+
+  build();
+})();
+</script>
+</body>
+</html>
